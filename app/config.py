@@ -1,0 +1,2 @@
+SPREADSHEET_ID = "1za606OQLJGX-vO0R07YjxJjn8cPxhOyMimlEgju63zI"
+SERVICE_ACCOUNT_FILE = "credentials.json"
