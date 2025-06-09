@@ -1,7 +1,6 @@
 venv/
-.credentials.json
-*.credentials
+credentials.json
 .plussbotss-70d2085f465f
-.ngrok.exe
+ngrok.exe
 __pycache__/
 *.py[cod]
