@@ -7,30 +7,28 @@ from .sheets import add_to_sheet
 
 ns = Namespace('Webhook', description='Endpoints do webhook')
 
-# Estado dos usuários (em memória)
 user_states = {}
 
-# Campos que queremos coletar (adicionado 'observacoes')
-fields = ['nome', 'cnpj', 'qtd_faixas', 'qtd_lateral', 'observacoes']
+fields = ['nome', 'nome_empresa', 'cnpj', 'qtd_faixas', 'qtd_lateral', 'cep', 'observacoes']
 questions = {
     'nome': 'Por favor, informe seu *nome completo*:',
+    'nome_empresa': 'Por favor, informe o *nome da empresa*:',
     'cnpj': 'Informe seu *CNPJ*:',
     'qtd_faixas': 'Quantas *faixas* deseja?',
     'qtd_lateral': 'Quantas *laterais* deseja?',
+    'cep': 'Por favor, informe seu *CEP*:',
     'observacoes': 'Por favor, insira suas *observações do pedido*:'
 }
 
-# Preços (exemplo)
 precos = (
     "*Tabela de Preços:*\n\n"
-    "• Faixa: R$ 50,00 cada\n"
-    "• Lateral: R$ 30,00 cada\n"
+    "• Faixa  : R$ 150,00 cada\n"
+    "• Lateral: R$ 50,00 cada\n"
     "\n"
     "_Valores podem variar conforme quantidade ou personalização._"
 )
 
-# Menu inicial
-saudacao = "Boa tarde! Esse é um atendimento automático, gostaria de agilizar o seu processo de pedido?"
+saudacao = "Bom dia! Esse é um atendimento automatizado da MaringáFaixas. Faça o seu pedido abaixo e nós te atenderemos o mais rápido possível!\n\n"
 opcoes_menu = (
     "\n\nSelecione uma opção:\n\n"
     "1 - Cadastrar informações do pedido\n"
@@ -45,7 +43,6 @@ class WebhookTwilio(Resource):
         body = request.form.get('Body').strip().lower()
         response = MessagingResponse()
 
-        # Se é a primeira mensagem, apresenta a saudação + opções
         if from_number not in user_states:
             user_states[from_number] = {'status': 'menu'}
             response.message(saudacao + opcoes_menu)
@@ -53,7 +50,6 @@ class WebhookTwilio(Resource):
 
         user_state = user_states[from_number]
 
-        # Usuário está no menu
         if user_state['status'] == 'menu':
             if body in ['1', 'fazer cadastro', 'cadastro']:
                 user_state['status'] = 'cadastro'
@@ -61,7 +57,7 @@ class WebhookTwilio(Resource):
                 user_state['data'] = {}
                 # Gera e armazena o ID
                 user_state['id'] = str(uuid.uuid4())
-                response.message("Perfeito! Vamos começar seu cadastro.\n\n" + questions[fields[0]])
+                response.message("Perfeito! Vamos começar seu cadastro. Lembre-se de enviar apenas as informações solicitadas, nada mais ok ?\n\n" + questions[fields[0]])
 
             elif body in ['2', 'ver preços', 'preço', 'preços']:
                 response.message(precos + opcoes_menu)  # aqui só as opções, sem saudação
@@ -79,7 +75,7 @@ class WebhookTwilio(Resource):
 
             return Response(str(response), mimetype="application/xml")
 
-        # Se está no fluxo de cadastro
+     
         if user_state['status'] == 'cadastro':
             step = user_state['step']
             current_field = fields[step]
@@ -93,21 +89,24 @@ class WebhookTwilio(Resource):
                 response.message(questions[next_field])
             else:
                 dados = user_state['data']
+                data_criacao = datetime.now().strftime("%d/%m/%Y")  
                 linha = [
-                    user_state['id'],  # ID único
-                    from_number,       # Telefone do usuário
+                    user_state['id'],  
+                    from_number,       
                     dados['nome'],
+                    dados['nome_empresa'],  
                     dados['cnpj'],
                     dados['qtd_faixas'],
                     dados['qtd_lateral'],
+                    dados['cep'],          
                     dados['observacoes'],
-                    datetime.now().isoformat()  # Data e hora da criação em ISO 8601
+                    data_criacao         
                 ]
                 try:
                     add_to_sheet(linha)
                     response.message(
                         "*Cadastro concluído com sucesso!*\n"
-                        "Entraremos em contato com seu pedido assim que possível."
+                        "Agradecemos por fazer negócios com a MaringáFaixas. O prazo de entrega é entre 15-40 dias, logo mais nosso vendedor irá entrar em contato para envio do pix / boleto."
                     )
                 except Exception as e:
                     response.message(
@@ -117,6 +116,6 @@ class WebhookTwilio(Resource):
 
                 # Volta para o menu após finalizar
                 user_states[from_number] = {'status': 'menu'}
-                response.message("Se desejar, você pode recorrer a outra opção:\n\n" + opcoes_menu)
+                response.message("Caso queira fazer mais algum pedido, siga as instruções abaixo.\n\n" + opcoes_menu)
 
             return Response(str(response), mimetype="application/xml")
